@@ -38,3 +38,18 @@
 - When a fix recipe proves itself on a device, add it to `recipes.md` with the measured effect.
 - When a measurement is misleading (cache state, build type, emulator GPU), add the caveat to `measure.md`.
 - Keep entries short and evidence-based. A recipe without a measured effect is a hypothesis — label it as one.
+
+## Desktop toolchains (Qt + Rust + MSVC)
+
+- **`LNK1104: cannot open file '<app>.exe'`** means the app is still running. Do not kill the
+  user's instance: build into a second build directory (`-BuildDir build-b`) and test there.
+- **`fatal error C1060: compiler is out of heap space`**, `LNK1102: out of memory`, or rustc
+  exiting with `0xC0000409` are **machine memory**, not code. Limit the parallelism
+  (`CARGO_BUILD_JOBS=1`), close the audit's own leftovers, and retry before touching a line.
+- A crashed compiler can leave a **zombie process at 0 MB that cannot be killed** (access
+  denied) and poisons the target directory. Build into a separate target dir, or ask for a
+  reboot; do not chase the error in the source.
+- Installer builders (Inno `lzma2/max` + solid) can OOM on a busy machine: `lzma2/normal`,
+  solid off. 60-90 s is normal; do not kill at one minute.
+- The QML is compiled into the executable: a QML edit needs a rebuild (~10-30 s incremental).
+  There is no hot reload unless the project sets one up - say so instead of "it should show".

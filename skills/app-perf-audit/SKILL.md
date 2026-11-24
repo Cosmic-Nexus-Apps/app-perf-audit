@@ -14,6 +14,7 @@ Do not optimize from intuition. Every finding needs a `file:line` or a measureme
 - "it's fine on my phone, but users complain"
 - before a release, or after adding a heavy screen
 - battery or heat complaints
+- a desktop app (Qt/QML, native engine) that lags, will not start on another machine, or grows memory with image size
 
 ## Hard rules
 
@@ -43,6 +44,9 @@ Do not optimize from intuition. Every finding needs a `file:line` or a measureme
 | Battery/heat, app never idle | infinite repeat animations, hidden screens still mounted | `references/symptoms.md` — idle-fps |
 | Grows over time, crashes for some users | unvirtualized lists, base64 in memory, unbounded caches | `references/symptoms.md` — memory |
 | Slow cold start | serial initializers, dead code parsing large payloads at boot | `references/symptoms.md` — boot |
+| Desktop: will not start / aborts before painting | RHI device creation failed (D3D11 on Windows) | `references/symptoms.md` — dark-screen (desktop) |
+| Desktop: slider/drag freezes the window | full-resolution render on every change | `references/recipes.md` — 8 |
+| Desktop: "my image is noisy" after a resize | downscaled image aliasing, not sensor noise | `references/symptoms.md` — desktop-qt |
 
 ## Recipes (verified)
 

@@ -163,3 +163,35 @@ Checklist when converting:
 - Replace `LayoutAnimation.configureNext` with nothing, or with a native-driver transform; never keep a global layout animation in an app where all tabs stay mounted.
 - Prefetch a neighbourhood of frames, not the whole set.
 - `removeClippedSubviews` on a long `ScrollView` as a stopgap — not a replacement for virtualization.
+
+## 8. Progressive preview (desktop, measured)
+
+A 4K render on every slider move is a freeze; a stale preview is a lie. Split by intent:
+
+- debounce ~40 ms while the value keeps changing -> render at ~1/3 width;
+- settle timer ~300 ms after the last change -> render full resolution.
+
+Measured on one 4K frame: 0.32 s preview vs 4.5 s full; the settle render lands 0.3 s after
+the hand leaves the slider, so the user never sees a half-resolution frame while judging.
+
+```cpp
+// setter path
+m_adjusting = true;  m_settle.start();  m_debounce.start(40);
+// debounce -> render() with preview = m_adjusting
+// settle   -> m_adjusting = false; render()
+```
+
+Keep the preview flag out of exports: an export must always be full resolution.
+
+## 9. Soft threshold for a fill: match the grain (desktop, measured)
+
+An inpainting/retouch pass that writes a smooth patch into a grainy frame reads as "erased"
+at 100% even when the average level is right. Measure the grain (median |high-pass| / 0.6745)
+on the untouched pixels and add the same sigma to the patch, per channel. Users describe the
+smooth version as a bug ("it looks wiped"), not as a missing texture.
+
+## 10. Software renderer fallback (desktop)
+
+`--software` that sets `QT_QUICK_BACKEND=software` before the QGuiApplication exists turns a
+"does not start on this machine" ticket into a usable app. Pair it with the log line that
+names the D3D11 error, so the next report is one screenshot away from a diagnosis.

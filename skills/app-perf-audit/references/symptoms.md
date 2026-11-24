@@ -71,6 +71,51 @@ Not performance, but the same read: a screen opened with default props (`lat`/`l
 
 Check: every prop a caller could pass vs the defaults in the component signature.
 
+## desktop-qt (Qt 6 / QML + native engine)
+
+The entries above are React Native. These were measured on a Qt/QML desktop app with a
+Rust engine (4K frames, 3856x2180 = 8.4 M pixels, one f32 plane = 33 MB).
+
+### dark-screen (desktop): the RHI device cannot be created
+
+The window never paints (or the process aborts) and the log says:
+
+```
+Failed to create D3D11 device and context: COM error 0x887a0004
+```
+
+`DXGI_ERROR_UNSUPPORTED` - the driver refused the device (GPU reset, remote session,
+driver update, or after many consecutive runs). Qt Quick does **not** always fall back to
+a software renderer; the process can die before the first frame.
+
+- Fix: ship an explicit flag that sets the backend **before** `QGuiApplication` is built
+  (parse argv first, then `qputenv("QT_QUICK_BACKEND", "software")`). Do not rely on Qt's
+  fallback.
+- Grep: `QSG_RHI_BACKEND`, `QT_QUICK_BACKEND`, `qputenv`, `setGraphicsApi`.
+
+### open-lag (desktop): full-resolution render on every change
+
+A 4K frame re-rendered at full size costs 1.5-4.5 s; the user reads it as "the app froze".
+The split that works: a downsampled preview while the value is moving, full resolution
+after it settles (see recipe 8). Measured on the same frame: 0.32 s preview vs 4.5 s full.
+
+### "my image is noisy" is not always noise
+
+A 4K image drawn at ~30% with bilinear sampling **aliases**: the dark sky shows coloured
+speckle that looks exactly like sensor noise, and users report it as an image problem.
+`Image { mipmap: true }` removes it. Always check the display path before blaming the data.
+
+### memory (desktop): f32 planes multiply
+
+Every `Vec<f32>` of a 4K frame is 33 MB. A three-layer split keeps background + starless +
+stars + the working copies: ~1.2 GB peak, which OOM'd a 16 GB machine while other apps were
+open. Growth that follows *image size*, not time, is the release risk.
+
+- Measure after each step: idle -> open -> layer split -> export (`WorkingSet` /
+  `PrivateMemorySize64` on Windows, RSS elsewhere).
+- A tiled pipeline (process bands of rows) is the real fix; do not micro-optimise the maths
+  first (see `measure.md`: the arithmetic is not the cost).
+
 ## Cross-platform map
 
 | Concern | React Native | Compose | Flutter | SwiftUI | Qt/QML |
@@ -81,4 +126,5 @@ Check: every prop a caller could pass vs the defaults in the component signature
 | Gesture vs scroll | `Gesture.Pan` + `failOffsetY` | nested scroll | `GestureDetector` arenas | `simultaneousGesture` | `Flickable` + `DragHandler` |
 | Image downsampling | `resizeMethod` | sized `Image` + decoder | `cacheWidth` | `resizableImage` | `QQuickImage.sourceSize` |
 
-These mappings are conceptual, not verified recipe by recipe.
+The React Native row entries are the original, device-verified ones. The desktop rows are measured on a Qt/QML app; the rest of the map is conceptual.
+
